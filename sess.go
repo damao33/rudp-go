@@ -539,3 +539,21 @@ func (s *UDPSession) GetSRTTVar() int32 {
 	defer s.mu.Unlock()
 	return s.rudp.rx_rttvar
 }
+
+func NewConn3(convid uint32, raddr net.Addr, block BlockCrypt, dataShards, parityShards int, conn net.PacketConn) (*UDPSession, error) {
+	return newUDPSession(convid, conn, block, dataShards, parityShards, nil, false, raddr), nil
+}
+
+func NewConn2(raddr net.Addr, block BlockCrypt, dataShards, parityShards int, conn net.PacketConn) (*UDPSession, error) {
+	var convid uint32
+	binary.Read(rand.Reader, binary.LittleEndian, &convid)
+	return NewConn3(convid, raddr, block, dataShards, parityShards, conn)
+}
+
+func NewConn(raddr string, block BlockCrypt, dataShards, parityShards int, conn net.PacketConn) (*UDPSession, error) {
+	udpaddr, err := net.ResolveUDPAddr("udp", raddr)
+	if err != nil {
+		return nil, errors.WithStack(err)
+	}
+	return NewConn2(udpaddr, block, dataShards, parityShards, conn)
+}
