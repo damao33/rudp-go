@@ -981,6 +981,36 @@ func (rudp *RUDP) NoDelay(noDelay int, interval int, resend int, noCwnd int) {
 	}
 }
 
+// SetMtu changes MTU size, default is 1400
+func (rudp *RUDP) SetMtu(mtu int) int {
+	if mtu < 50 || mtu < IRUDP_OVERHEAD {
+		return -1
+	}
+	if rudp.reserved >= int(rudp.mtu-IRUDP_OVERHEAD) || rudp.reserved < 0 {
+		return -1
+	}
+
+	buffer := make([]byte, mtu)
+	if buffer == nil {
+		return -2
+	}
+	rudp.mtu = uint32(mtu)
+	rudp.mss = rudp.mtu - IRUDP_OVERHEAD - uint32(rudp.reserved)
+	rudp.buffer = buffer
+	return 0
+}
+
+// WndSize sets maximum window size: sndwnd=32, rcvwnd=32 by default
+func (rudp *RUDP) WndSize(sndwnd int, rcvwnd int) int {
+	if sndwnd > 0 {
+		rudp.snd_wnd = uint32(sndwnd)
+	}
+	if rcvwnd > 0 {
+		rudp.rcv_wnd = uint32(rcvwnd)
+	}
+	return 0
+}
+
 // 取中值
 func bound(low, mid, high uint32) uint32 {
 	return min(max(low, mid), high)

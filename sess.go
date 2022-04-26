@@ -78,6 +78,17 @@ type (
 
 		mu sync.Mutex
 	}
+	setReadBuffer interface {
+		SetReadBuffer(bytes int) error
+	}
+
+	setWriteBuffer interface {
+		SetWriteBuffer(bytes int) error
+	}
+
+	setDSCP interface {
+		SetDSCP(int) error
+	}
 )
 
 var (
@@ -556,4 +567,106 @@ func NewConn(raddr string, block BlockCrypt, dataShards, parityShards int, conn 
 		return nil, errors.WithStack(err)
 	}
 	return NewConn2(udpaddr, block, dataShards, parityShards, conn)
+}
+
+// SetWriteDelay delays write for bulk transfer until the next update interval
+func (s *UDPSession) SetWriteDelay(delay bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.writeDelay = delay
+}
+
+// SetWindowSize set maximum window size
+func (s *UDPSession) SetWindowSize(sndwnd, rcvwnd int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rudp.WndSize(sndwnd, rcvwnd)
+}
+
+// SetMtu sets the maximum transmission unit(not including UDP header)
+func (s *UDPSession) SetMtu(mtu int) bool {
+	if mtu > mtuLimit {
+		return false
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rudp.SetMtu(mtu)
+	return true
+}
+
+// SetStreamMode toggles the stream mode on/off
+func (s *UDPSession) SetStreamMode(enable bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if enable {
+		s.rudp.stream = 1
+	} else {
+		s.rudp.stream = 0
+	}
+}
+
+// SetACKNoDelay changes ack flush option, set true to flush ack immediately,
+func (s *UDPSession) SetACKNoDelay(nodelay bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ackNoDelay = nodelay
+}
+
+// SetDSCP sets the 6bit DSCP field in IPv4 header, or 8bit Traffic Class in IPv6 header.
+//
+// if the underlying connection has implemented `func SetDSCP(int) error`, SetDSCP() will invoke
+// this function instead.
+//
+// It has no effect if it's accepted from Listener.
+func (s *UDPSession) SetDSCP(dscp int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.listener != nil {
+		return errInvalidOperation
+	}
+
+	// interface enabled
+	if ts, ok := s.conn.(setDSCP); ok {
+		return ts.SetDSCP(dscp)
+	}
+
+	if nc, ok := s.conn.(net.Conn); ok {
+		var succeed bool
+		if err := ipv4.NewConn(nc).SetTOS(dscp << 2); err == nil {
+			succeed = true
+		}
+		if err := ipv6.NewConn(nc).SetTrafficClass(dscp); err == nil {
+			succeed = true
+		}
+
+		if succeed {
+			return nil
+		}
+	}
+	return errInvalidOperation
+}
+
+// SetReadBuffer sets the socket read buffer, no effect if it's accepted from Listener
+func (s *UDPSession) SetReadBuffer(bytes int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.listener == nil {
+		if nc, ok := s.conn.(setReadBuffer); ok {
+			return nc.SetReadBuffer(bytes)
+		}
+	}
+	return errInvalidOperation
+}
+
+// SetWriteBuffer sets the socket write buffer, no effect if it's accepted from Listener
+func (s *UDPSession) SetWriteBuffer(bytes int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.listener == nil {
+		if nc, ok := s.conn.(setWriteBuffer); ok {
+			return nc.SetWriteBuffer(bytes)
+		}
+	}
+	return errInvalidOperation
 }
