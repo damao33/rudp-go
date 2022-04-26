@@ -3,6 +3,8 @@ package rudp
 import (
 	"encoding/binary"
 	"github.com/pkg/errors"
+	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 	"io"
 	"net"
 	"sync"
@@ -149,4 +151,46 @@ func (l *Listener) AcceptRUDP() (*UDPSession, error) {
 	case <-l.die:
 		return nil, errors.WithStack(io.ErrClosedPipe)
 	}
+}
+
+// SetDSCP sets the 6bit DSCP field in IPv4 header, or 8bit Traffic Class in IPv6 header.
+//
+// if the underlying connection has implemented `func SetDSCP(int) error`, SetDSCP() will invoke
+// this function instead.
+func (l *Listener) SetDSCP(dscp int) error {
+	// interface enabled
+	if ts, ok := l.conn.(setDSCP); ok {
+		return ts.SetDSCP(dscp)
+	}
+
+	if nc, ok := l.conn.(net.Conn); ok {
+		var succeed bool
+		if err := ipv4.NewConn(nc).SetTOS(dscp << 2); err == nil {
+			succeed = true
+		}
+		if err := ipv6.NewConn(nc).SetTrafficClass(dscp); err == nil {
+			succeed = true
+		}
+
+		if succeed {
+			return nil
+		}
+	}
+	return errInvalidOperation
+}
+
+// SetReadBuffer sets the socket read buffer for the Listener
+func (l *Listener) SetReadBuffer(bytes int) error {
+	if nc, ok := l.conn.(setReadBuffer); ok {
+		return nc.SetReadBuffer(bytes)
+	}
+	return errInvalidOperation
+}
+
+// SetWriteBuffer sets the socket write buffer for the Listener
+func (l *Listener) SetWriteBuffer(bytes int) error {
+	if nc, ok := l.conn.(setWriteBuffer); ok {
+		return nc.SetWriteBuffer(bytes)
+	}
+	return errInvalidOperation
 }
