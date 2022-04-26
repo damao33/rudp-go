@@ -1,4 +1,4 @@
-module rudp
+module github.com/damao33/rudp-go
 
 go 1.17
 
