@@ -520,14 +520,18 @@ func newUDPSession(conv uint32, conn net.PacketConn, block BlockCrypt, dataShard
 
 	if sess.listener == nil { // 客户端连接
 		go sess.readLoop()
-		// snmp
+		atomic.AddUint64(&DefaultSnmp.ActiveOpens, 1)
 	} else {
-		// snmp
+		atomic.AddUint64(&DefaultSnmp.PassiveOpens, 1)
 	}
 
 	SysTimeSched.Put(sess.update, time.Now())
 
-	// snmp
+	currestab := atomic.AddUint64(&DefaultSnmp.CurrEstab, 1)
+	maxconn := atomic.LoadUint64(&DefaultSnmp.MaxConn)
+	if currestab > maxconn {
+		atomic.CompareAndSwapUint64(&DefaultSnmp.MaxConn, maxconn, currestab)
+	}
 
 	return sess
 }

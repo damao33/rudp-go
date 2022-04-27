@@ -332,7 +332,7 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 			return -3
 		}
 		inSegs++
-		data = data[:length]
+		data = data[length:]
 	}
 	atomic.AddUint64(&DefaultSnmp.InSegs, inSegs)
 
@@ -729,7 +729,7 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 	// 流量控制滑动窗口，把snd_queue的数据转移到snd_buf
 	newSegCount := 0
 	for i := range rudp.snd_queue {
-		if rudp.snd_nxt >= rudp.snd_una+rudp.cwnd {
+		if rudp.snd_nxt >= rudp.snd_una+cwnd {
 			break
 		}
 		newSeg := rudp.snd_queue[i]
