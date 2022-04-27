@@ -2,6 +2,7 @@ package rudp
 
 import (
 	"encoding/binary"
+	"sync/atomic"
 	"time"
 )
 
@@ -254,6 +255,7 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 	oldSndUna := rudp.snd_una
 	var flag int
 	var latest uint32
+	var inSegs uint64
 	var windowSlide bool
 	for {
 		if len(data) < IRUDP_OVERHEAD {
@@ -312,9 +314,8 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 					repeat = rudp.parseData(seg)
 				}
 			}
-			// TODO : defaultSnmp
 			if regular && repeat {
-
+				atomic.AddUint64(&DefaultSnmp.RepeatSegs, 1)
 			}
 		case IRUDP_CMD_ACK:
 			rudp.parseAck(sn)
@@ -330,9 +331,11 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 		default:
 			return -3
 		}
+		inSegs++
 		data = data[:length]
 	}
-	// TODO : defaultSnmp
+	atomic.AddUint64(&DefaultSnmp.InSegs, inSegs)
+
 	// 根据新的rtt更新rto
 	if flag != 0 && regular {
 		current := currentMs()
@@ -664,7 +667,6 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 	// 将ack分片添加到buffer中
 	for i, ack := range rudp.acklist {
 		makeSpace(IRUDP_OVERHEAD)
-		// TODO ?
 		if ack.sn >= rudp.rcv_nxt || len(rudp.acklist)-1 == i {
 			seg.sn, seg.ts = ack.sn, ack.ts
 			// 把seg打包到buffer中
@@ -817,19 +819,20 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 	// 发送剩余数据
 	flushBuffer()
 
-	// TODO defaultSnmp
 	sum := lostSegs
 	if lostSegs > 0 {
-
+		atomic.AddUint64(&DefaultSnmp.LostSegs, lostSegs)
 	}
 	if fastRetransSegs > 0 {
+		atomic.AddUint64(&DefaultSnmp.FastRetransSegs, fastRetransSegs)
 		sum += fastRetransSegs
 	}
 	if earlyRetransSegs > 0 {
+		atomic.AddUint64(&DefaultSnmp.EarlyRetransSegs, earlyRetransSegs)
 		sum += earlyRetransSegs
 	}
 	if sum > 0 {
-
+		atomic.AddUint64(&DefaultSnmp.RetransSegs, sum)
 	}
 
 	// 更新拥塞窗口cwnd
@@ -1046,7 +1049,7 @@ func (seg segment) encodeOverHead(ptr []byte) []byte {
 	ptr = encodeUint32(ptr, seg.sn)
 	ptr = encodeUint32(ptr, seg.una)
 	ptr = encodeUint32(ptr, uint32(len(seg.data)))
-	// TODO : defaultSnmp
+	atomic.AddUint64(&DefaultSnmp.OutSegs, 1)
 	return ptr
 }
 

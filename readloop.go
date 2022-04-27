@@ -1,6 +1,9 @@
 package rudp
 
-import "github.com/pkg/errors"
+import (
+	"github.com/pkg/errors"
+	"sync/atomic"
+)
 
 func (s *UDPSession) defaultReadLoop() {
 	buf := make([]byte, mtuLimit)
@@ -10,7 +13,7 @@ func (s *UDPSession) defaultReadLoop() {
 			if src == "" {
 				src = addr.String()
 			} else if src != addr.String() {
-				//TODO snmp
+				atomic.AddUint64(&DefaultSnmp.InErrs, 1)
 				continue
 			}
 			s.packetInput(buf[:n])

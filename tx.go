@@ -3,6 +3,7 @@ package rudp
 import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/ipv4"
+	"sync/atomic"
 )
 
 func (s *UDPSession) defaultTx(txqueue []ipv4.Message) {
@@ -17,5 +18,6 @@ func (s *UDPSession) defaultTx(txqueue []ipv4.Message) {
 			break
 		}
 	}
-	// TODO SNMP
+	atomic.AddUint64(&DefaultSnmp.OutPkts, uint64(byteCount))
+	atomic.AddUint64(&DefaultSnmp.OutBytes, uint64(pkgCount))
 }

@@ -108,7 +108,7 @@ func (s *UDPSession) Read(b []byte) (n int, err error) {
 			n = copy(b, s.bufPtr)
 			s.bufPtr = s.bufPtr[n:]
 			s.mu.Unlock()
-			// TODO SNMP
+			atomic.AddUint64(&DefaultSnmp.BytesReceived, uint64(n))
 			return n, nil
 		}
 
@@ -116,7 +116,7 @@ func (s *UDPSession) Read(b []byte) (n int, err error) {
 			if len(b) >= size {
 				s.rudp.Receive(b)
 				s.mu.Unlock()
-				// TODO SNMP
+				atomic.AddUint64(&DefaultSnmp.BytesReceived, uint64(size))
 				return size, nil
 			}
 			// 如果有必要，重新调整rcvBuf大小以适应数据
@@ -128,7 +128,7 @@ func (s *UDPSession) Read(b []byte) (n int, err error) {
 			n = copy(b, s.rcvBuf)
 			s.bufPtr = s.rcvBuf[n:]
 			s.mu.Unlock()
-			// TODO SNMP
+			atomic.AddUint64(&DefaultSnmp.BytesReceived, uint64(n))
 			return n, nil
 		}
 
@@ -196,7 +196,7 @@ func (s *UDPSession) WriteBuffers(buffers [][]byte) (n int, err error) {
 				s.uncork()
 			}
 			s.mu.Unlock()
-			// TODO SNMP
+			atomic.AddUint64(&DefaultSnmp.BytesSent, uint64(n))
 			return n, nil
 		}
 
@@ -237,7 +237,7 @@ func (s *UDPSession) Close() error {
 	})
 
 	if once {
-		// TODO SNMP
+		atomic.AddUint64(&DefaultSnmp.CurrEstab, ^uint64(0))
 		// 尽量发送队列中所有数据
 		s.mu.Lock()
 		s.rudp.flush(false)
@@ -345,7 +345,12 @@ func (s *UDPSession) rudpInput(data []byte) {
 	}
 	s.uncork()
 	s.mu.Unlock()
-	// TODO SNMP
+	atomic.AddUint64(&DefaultSnmp.InPkts, 1)
+	atomic.AddUint64(&DefaultSnmp.InBytes, uint64(len(data)))
+
+	if rudpInErrors > 0 {
+		atomic.AddUint64(&DefaultSnmp.rudpInErrors, rudpInErrors)
+	}
 }
 
 func (s *UDPSession) notifyReadEvent() {
