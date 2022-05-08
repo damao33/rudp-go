@@ -685,8 +685,8 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 			rudp.tsProbe = currentTime + rudp.probeWait
 		} else {
 			if timeDiff(currentTime, rudp.tsProbe) >= 0 {
-				if rudp.probeWait < IRUDP_PROBE_INIT {
-					rudp.probeWait = IRUDP_PROBE_INIT
+				if rudp.probeWait < IRUDP_PROBE_MIN {
+					rudp.probeWait = IRUDP_PROBE_MIN
 				}
 				rudp.probeWait += rudp.probeWait / 2
 				rudp.probeWait = min(IRUDP_PROBE_LIMIT, rudp.probeWait)
@@ -751,7 +751,7 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 	var change, fastRetransSegs, earlyRetransSegs, lostSegs uint64
 	ref := rudp.sndBuf[:len(rudp.sndBuf)]
 	for i := range ref {
-		s := &rudp.sndBuf[i]
+		s := &ref[i]
 		needSend := false
 		if s.acked == 1 {
 			continue
