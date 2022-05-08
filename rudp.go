@@ -749,7 +749,7 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 	if resent <= 0 {
 		resent = 0xffffffff
 	}
-	minRto := int32(rudp.rxMinRTO)
+	minRto := int32(rudp.interval)
 	current := currentMs()
 	var change, fastRetransSegs, earlyRetransSegs, lostSegs uint64
 	ref := rudp.sndBuf[:len(rudp.sndBuf)]
@@ -769,7 +769,7 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 			needSend = true
 			s.fastack = 0
 			s.rto = rudp.rxRTO
-			s.resendts = current + rudp.rxRTO
+			s.resendts = current + s.rto
 			change++
 			fastRetransSegs++
 		} else if s.fastack > 0 && newSegCount == 0 {
