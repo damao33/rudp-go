@@ -689,8 +689,10 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 					rudp.probeWait = IRUDP_PROBE_MIN
 				}
 				rudp.probeWait += rudp.probeWait / 2
-				rudp.probeWait = min(IRUDP_PROBE_LIMIT, rudp.probeWait)
-				rudp.tsProbe = currentTime + rudp.probeWait
+				if rudp.probeWait > IRUDP_PROBE_LIMIT {
+					rudp.probeWait = IRUDP_PROBE_LIMIT
+				}
+				rudp.tsProbe = current + rudp.probeWait
 				rudp.probe |= IRUDP_ASK_SEND
 			}
 		}
@@ -840,7 +842,9 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 			// 当前发送窗口大小
 			inflight := rudp.sndNxt - rudp.sndUna
 			rudp.ssthresh = inflight / 2
-			rudp.ssthresh = max(rudp.ssthresh, IRUDP_THRESH_MIN)
+			if rudp.ssthresh < IRUDP_THRESH_MIN {
+				rudp.ssthresh = IRUDP_THRESH_MIN
+			}
 			rudp.cwnd = rudp.ssthresh + resent
 			rudp.incr = rudp.cwnd * rudp.mss
 		}
@@ -849,7 +853,9 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 		// 发生超时重传，进入慢启动
 		if lostSegs > 0 {
 			rudp.ssthresh = cwnd / 2
-			rudp.ssthresh = max(rudp.ssthresh, IRUDP_THRESH_MIN)
+			if rudp.ssthresh < IRUDP_THRESH_MIN {
+				rudp.ssthresh = IRUDP_THRESH_MIN
+			}
 			rudp.cwnd = 1
 			rudp.incr = rudp.mss
 		}
