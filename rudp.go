@@ -685,8 +685,8 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 			rudp.tsProbe = currentTime + rudp.probeWait
 		} else {
 			if timeDiff(currentTime, rudp.tsProbe) >= 0 {
-				if rudp.probeWait < IRUDP_PROBE_MIN {
-					rudp.probeWait = IRUDP_PROBE_MIN
+				if rudp.probeWait < IRUDP_PROBE_INIT {
+					rudp.probeWait = IRUDP_PROBE_INIT
 				}
 				rudp.probeWait += rudp.probeWait / 2
 				rudp.probeWait = min(IRUDP_PROBE_LIMIT, rudp.probeWait)

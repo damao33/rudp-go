@@ -27,7 +27,10 @@ type segment struct {
 
 func TestSlice(t *testing.T) {
 	s1 := []byte{1, 2, 3}
-	s2 := []byte{4, 5, 6, 7}
-	s1 = append(s1, s2[:2]...)
+	s2 := s1[:0]
+	s3 := s1[0:0]
+	fmt.Println(len(s2), cap(s2), len(s3), cap(s3))
 	fmt.Println(s1)
+	fmt.Println(s2)
+	fmt.Println(s3)
 }
