@@ -692,7 +692,7 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 				if rudp.probeWait > IRUDP_PROBE_LIMIT {
 					rudp.probeWait = IRUDP_PROBE_LIMIT
 				}
-				rudp.tsProbe = current + rudp.probeWait
+				rudp.tsProbe = currentTime + rudp.probeWait
 				rudp.probe |= IRUDP_ASK_SEND
 			}
 		}
