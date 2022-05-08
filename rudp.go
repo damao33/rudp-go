@@ -1031,8 +1031,11 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 			need := IRUDP_OVERHEAD + len(segment.data)
 			makeSpace(need)
 
+			/*ptr = segment.encodeOverHead(ptr)
+			ptr = segment.encodeData(ptr)*/
 			ptr = segment.encodeOverHead(ptr)
-			ptr = segment.encodeData(ptr)
+			copy(ptr, segment.data)
+			ptr = ptr[len(segment.data):]
 
 			//判断该分片重传次数是否大于最大重传次数
 			if segment.xmit >= rudp.deadLink {
