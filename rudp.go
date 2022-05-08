@@ -227,12 +227,12 @@ func (rudp *RUDP) Send(buffer []byte) int {
 		copy(seg.data, buffer[:size])
 		buffer = buffer[size:]
 		// 如果是流模式则其分片编号为0，否则为相应数量编号
-		/*if rudp.stream == 0 {
+		if rudp.stream == 0 {
 			seg.frg = uint8(count - i - 1)
 		} else {
 			seg.frg = 0
-		}*/
-		seg.frg = uint8(count - i - 1)
+		}
+		//seg.frg = uint8(count - i - 1)
 		rudp.sndQueue = append(rudp.sndQueue, seg)
 	}
 	return 0
