@@ -10,7 +10,7 @@ import (
 )
 
 func testlink(t *testing.T, client *lossyconn.LossyConn, server *lossyconn.LossyConn, nodelay, interval, resend, nc int) {
-	t.Log("testing with nodelay parameters:", nodelay, interval, resend, nc)
+	t.Log("testing with noDelay parameters:", nodelay, interval, resend, nc)
 	sess, _ := NewConn2(server.LocalAddr(), nil, 0, 0, client)
 	listener, _ := ServeConn(nil, 0, 0, server)
 	echoServer := func(l *Listener) {
@@ -66,7 +66,7 @@ func testlink(t *testing.T, client *lossyconn.LossyConn, server *lossyconn.Lossy
 }
 func TestLossyConn1(t *testing.T) {
 	t.Log("testing loss rate 10%, rtt 200ms")
-	t.Log("testing link with nodelay parameters:1 10 2 1")
+	t.Log("testing link with noDelay parameters:1 10 2 1")
 	client, err := lossyconn.NewLossyConn(0.1, 100)
 	if err != nil {
 		t.Fatal(err)
@@ -81,7 +81,7 @@ func TestLossyConn1(t *testing.T) {
 
 func TestLossyConn4(t *testing.T) {
 	t.Log("testing loss rate 10%, rtt 200ms")
-	t.Log("testing link with nodelay parameters:1 10 2 0")
+	t.Log("testing link with noDelay parameters:1 10 2 0")
 	client, err := lossyconn.NewLossyConn(0.1, 100)
 	if err != nil {
 		t.Fatal(err)
@@ -100,15 +100,15 @@ func TestSend(t *testing.T) {
 	rudp.mss = 3
 	sndQueue := make([]segment, 1)
 	sndQueue[0].data = []byte{0, 1, 2}
-	rudp.snd_queue = sndQueue
-	for i := 0; i < len(rudp.snd_queue); i++ {
+	rudp.sndQueue = sndQueue
+	for i := 0; i < len(rudp.sndQueue); i++ {
 		fmt.Println(i)
-		fmt.Println(rudp.snd_queue[i])
+		fmt.Println(rudp.sndQueue[i])
 	}
 	rudp.Send([]byte{3, 4, 5, 6})
-	for i := 0; i < len(rudp.snd_queue); i++ {
+	for i := 0; i < len(rudp.sndQueue); i++ {
 		fmt.Println(i)
-		fmt.Println(rudp.snd_queue[i])
+		fmt.Println(rudp.sndQueue[i])
 	}
 }
 
@@ -122,10 +122,10 @@ func TestXmitBuf(t *testing.T) {
 
 func TestPeekSize(t *testing.T) {
 	rudp := NewRudp(1, func(buf []byte, size int) {})
-	rudp.rcv_queue = append(rudp.rcv_queue, segment{frg: 3, data: []byte{0, 1, 2, 3}})
-	rudp.rcv_queue = append(rudp.rcv_queue, segment{frg: 2, data: []byte{0, 1, 2}})
-	rudp.rcv_queue = append(rudp.rcv_queue, segment{frg: 1, data: []byte{0, 1}})
-	rudp.rcv_queue = append(rudp.rcv_queue, segment{frg: 0, data: []byte{0}})
-	rudp.rcv_queue = append(rudp.rcv_queue, segment{frg: 0, data: []byte{7, 8, 9}})
+	rudp.rcvQueue = append(rudp.rcvQueue, segment{frg: 3, data: []byte{0, 1, 2, 3}})
+	rudp.rcvQueue = append(rudp.rcvQueue, segment{frg: 2, data: []byte{0, 1, 2}})
+	rudp.rcvQueue = append(rudp.rcvQueue, segment{frg: 1, data: []byte{0, 1}})
+	rudp.rcvQueue = append(rudp.rcvQueue, segment{frg: 0, data: []byte{0}})
+	rudp.rcvQueue = append(rudp.rcvQueue, segment{frg: 0, data: []byte{7, 8, 9}})
 	fmt.Println(rudp.peekSize())
 }

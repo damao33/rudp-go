@@ -176,7 +176,7 @@ func (s *UDPSession) WriteBuffers(buffers [][]byte) (n int, err error) {
 
 		s.mu.Lock()
 		waitSnd := s.rudp.WaitSnd()
-		if waitSnd < int(s.rudp.snd_wnd) && waitSnd < int(s.rudp.rmt_wnd) {
+		if waitSnd < int(s.rudp.sndWnd) && waitSnd < int(s.rudp.rmtWnd) {
 			for _, buf := range buffers {
 				n += len(buf)
 				// 把buf放入snd_queue，数据过长则进行切片
@@ -191,7 +191,7 @@ func (s *UDPSession) WriteBuffers(buffers [][]byte) (n int, err error) {
 				}
 			}
 			waitSnd = s.rudp.WaitSnd()
-			if waitSnd >= int(s.rudp.snd_wnd) || waitSnd >= int(s.rudp.rmt_wnd) || !s.writeDelay {
+			if waitSnd >= int(s.rudp.sndWnd) || waitSnd >= int(s.rudp.rmtWnd) || !s.writeDelay {
 				s.rudp.flush(false)
 				s.uncork()
 			}
@@ -340,7 +340,7 @@ func (s *UDPSession) rudpInput(data []byte) {
 		s.notifyReadEvent()
 	}
 	waitSnd := s.rudp.WaitSnd()
-	if waitSnd < int(s.rudp.snd_wnd) && waitSnd < int(s.rudp.rmt_wnd) {
+	if waitSnd < int(s.rudp.sndWnd) && waitSnd < int(s.rudp.rmtWnd) {
 		s.notifyWriteEvent()
 	}
 	s.uncork()
@@ -403,7 +403,7 @@ func (s *UDPSession) update() {
 		interval := s.rudp.flush(false)
 		waitSnd := s.rudp.WaitSnd()
 		// 待发送数据数量小于双方窗口
-		if waitSnd < int(s.rudp.snd_wnd) && waitSnd < int(s.rudp.rmt_wnd) {
+		if waitSnd < int(s.rudp.sndWnd) && waitSnd < int(s.rudp.rmtWnd) {
 			s.notifyWriteEvent()
 		}
 		s.uncork()
@@ -543,21 +543,21 @@ func (s *UDPSession) GetConv() uint32 { return s.rudp.conv }
 func (s *UDPSession) GetRTO() uint32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.rudp.rx_rto
+	return s.rudp.rxRTO
 }
 
 // GetSRTT gets current srtt of the session
 func (s *UDPSession) GetSRTT() int32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.rudp.rx_srtt
+	return s.rudp.rxSRTT
 }
 
 // GetRTTVar gets current rtt variance of the session
 func (s *UDPSession) GetSRTTVar() int32 {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.rudp.rx_rttvar
+	return s.rudp.rxRTTVal
 }
 
 func NewConn3(convid uint32, raddr net.Addr, block BlockCrypt, dataShards, parityShards int, conn net.PacketConn) (*UDPSession, error) {

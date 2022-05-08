@@ -56,7 +56,7 @@ type segment struct {
 	wnd uint16
 	// 当前毫秒时间戳
 	ts uint32
-	// 下一个待发报的序号
+	// 确认序列号
 	sn uint32
 	// 代表编号前面的所有报都收到了的标志
 	una uint32
@@ -67,7 +67,7 @@ type segment struct {
 	resendts uint32
 	// 快速应答数量，记录被跳过的次数，统计在这个封包的序列号之前有多少报已经应答了。
 	// 比如1，2，3三个封包，收到2的时候知道1被跳过了，此时1的fastack加一，收到3的时候继续加一，超过一定阈值直接重传1这个封包。
-	// 该阈值由IRUDP_nodelay函数设置，默认为0
+	// 该阈值由noDelay函数设置，默认为0
 	fastack uint32
 	// 标记本报文是否已响应
 	acked uint32
@@ -80,81 +80,81 @@ type RUDP struct {
 	// mss：Maximum Segment Size，最大报文长度
 	// mtu：Maximum Transmission Unit，最大传输单元
 	conv, mtu, mss, state uint32
-	// snd_una：最小的未ack序列号，即这个编号前面的所有报都收到了的标志
-	// snd_nxt：下一个待发送的序列号
-	// rcv_nxt：下一个待接收的序列号，会通过包头中的una字段通知对端
-	snd_una, snd_nxt, rcv_nxt uint32
-	// ssthresh：slow start threshhold，慢启动阈值
+	// sndUna：最小的未ack序列号，即这个编号前面的所有报都收到了的标志
+	// sndNxt：下一个待发送的序列号
+	// rcvNxt：下一个待接收的序列号，会通过包头中的una字段通知对端
+	sndUna, sndNxt, rcvNxt uint32
+	// ssthresh：slow start threshold，慢启动阈值
 	ssthresh uint32
 	// RTT：Round Trip Time，往返时间
-	// rx_rttval：最近四次RTT的平均值
-	// rx_srtt：RTT的一个加权RTT平均值，平滑值
-	rx_rttvar, rx_srtt int32
-	// rx_rto：估算后的rto
-	// rx_minrto：最小rto，系统启动时配置
-	rx_rto, rx_minrto uint32
-	// snd_wnd：发送的窗口大小
-	// rcv_wnd：接收的窗口大小rcv_wnd
-	// rmt_wnd：远端（rmt=remote）拥塞窗口大小
+	// rxRTTVal：最近四次RTT的平均值
+	// rxSRTT：RTT的一个加权RTT平均值，平滑值
+	rxRTTVal, rxSRTT int32
+	// rxRTO：估算后的rto
+	// rxMinRTO：最小rto，系统启动时配置
+	rxRTO, rxMinRTO uint32
+	// sndWnd：发送的窗口大小
+	// rcvWnd：接收的窗口大小rcv_wnd
+	// rmtWnd：远端（rmt=remote）拥塞窗口大小
 	// cwnd： 拥塞窗口大小
 	// probe：存储探测标志位，IKCP_ASK_TELL表示告知远端窗口大小，IKCP_ASK_SEND表示请求远端告知窗口大小
-	snd_wnd, rcv_wnd, rmt_wnd, cwnd, probe uint32
+	sndWnd, rcvWnd, rmtWnd, cwnd, probe uint32
 	// interval：内部flush刷新间隔
-	// ts_flush：下次flush刷新时间戳
-	interval, ts_flush uint32
-	// nodelay: 0 不启用，1启用快速重传模式；
+	// tsFlush：下次flush刷新时间戳
+	interval, tsFlush uint32
+	// noDelay: 0 不启用，1启用快速重传模式；
 	// updated：是否调用过update函数
-	nodelay, updated uint32
-	// ts_probe：探查窗口的时间戳
-	// probe_wait：探查窗口需要等待的时间
-	ts_probe, probe_wait uint32
-	// dead_link： 最大重传次数，被认为连接中断（丢失次数）
+	noDelay, updated uint32
+	// tsProbe：探查窗口的时间戳
+	// probeWait：探查窗口需要等待的时间
+	tsProbe, probeWait uint32
+	// deadLink： 最大重传次数，被认为连接中断（丢失次数）
 	// incr：可发送最大数据量
-	dead_link, incr uint32
+	deadLink, incr uint32
 	// 快速重传：触发快速重传的ack数
-	fastresend int32
-	// nocwnd：是否关闭流控，0表示不关闭，默认值为0
+	fastResend int32
+	// noCwnd：是否关闭流控，0表示不关闭，默认值为0
 	// stream：是否启用流传输模式，0消息模式，1流模式
-	nocwnd, stream int32
+	noCwnd, stream int32
 
 	// 接收和发送队列
-	snd_queue []segment
-	rcv_queue []segment
+	sndQueue []segment
+	rcvQueue []segment
 	// 接收和发送缓冲区
-	snd_buf []segment
-	rcv_buf []segment
+	sndBuf []segment
+	rcvBuf []segment
 
 	// ack列表
-	acklist []ackItem
+	ackList []ackItem
 
 	// mtu缓冲区
 	buffer []byte
 	// 缓冲区保留多少buff
 	reserved int
 	// 回调
-	output output_callback
+	output outputCallback
 }
 
 type ackItem struct {
 	sn uint32
 	ts uint32
 }
-type output_callback func(buf []byte, size int)
+type outputCallback func(buf []byte, size int)
 
-func NewRudp(conv uint32, output output_callback) *RUDP {
+func NewRudp(conv uint32, output outputCallback) *RUDP {
 	rudp := new(RUDP)
 	rudp.conv = conv
 	rudp.mtu = IRUDP_MTU_DEF
 	rudp.mss = rudp.mtu - IRUDP_OVERHEAD
-	rudp.snd_wnd = IRUDP_WND_SND
-	rudp.rcv_wnd = IRUDP_WND_RCV
-	rudp.rmt_wnd = IRUDP_WND_RCV
+	rudp.sndWnd = IRUDP_WND_SND
+	rudp.rcvWnd = IRUDP_WND_RCV
+	rudp.rmtWnd = IRUDP_WND_RCV
 	rudp.ssthresh = IRUDP_THRESH_INIT
-	rudp.rx_rto = IRUDP_RTO_DEF
-	rudp.rx_minrto = IRUDP_RTO_MIN
+	rudp.rxRTO = IRUDP_RTO_DEF
+	rudp.rxMinRTO = IRUDP_RTO_MIN
 	rudp.interval = IRUDP_INTERVAL
-	rudp.ts_flush = IRUDP_INTERVAL
-	rudp.dead_link = IRUDP_DEADLINK
+	rudp.tsFlush = IRUDP_INTERVAL
+	rudp.deadLink = IRUDP_DEADLINK
 	rudp.buffer = make([]byte, rudp.mtu)
 	rudp.output = output
 	return rudp
@@ -181,10 +181,10 @@ func (rudp *RUDP) Send(buffer []byte) int {
 
 	// 在流式模式下将buffer填充到最后一个分片
 	if rudp.stream != 0 {
-		n := len(rudp.snd_queue)
+		n := len(rudp.sndQueue)
 		if n > 0 {
 			// 取出最后一个分片，计算填充空间
-			lastSegment := &rudp.snd_queue[n-1]
+			lastSegment := &rudp.sndQueue[n-1]
 			capacity := (int(rudp.mss)) - len(lastSegment.data)
 			extend := capacity
 			if len(buffer) < capacity {
@@ -209,7 +209,6 @@ func (rudp *RUDP) Send(buffer []byte) int {
 	}
 
 	// 判断接收窗口
-	// TODO why?
 	if count > 255 {
 		return -2
 	}
@@ -234,14 +233,14 @@ func (rudp *RUDP) Send(buffer []byte) int {
 			seg.frg = 0
 		}*/
 		seg.frg = uint8(count - i - 1)
-		rudp.snd_queue = append(rudp.snd_queue, seg)
+		rudp.sndQueue = append(rudp.sndQueue, seg)
 	}
 	return 0
 }
 
 //
 // Input
-// @Description: 从rcv_buf处理接收到的数据，添加到rcv_queue
+// @Description: 从rcvBuf处理接收到的数据，添加到rcvQueue
 // @receiver rudp
 // @param data
 // @param regular
@@ -252,7 +251,7 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 	if len(data) < IRUDP_OVERHEAD {
 		return -1
 	}
-	oldSndUna := rudp.snd_una
+	oldSndUna := rudp.sndUna
 	var flag int
 	var latest uint32
 	var inSegs uint64
@@ -286,7 +285,7 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 		}
 
 		if regular {
-			rudp.rmt_wnd = uint32(wnd)
+			rudp.rmtWnd = uint32(wnd)
 		}
 		if rudp.parseUna(una) > 0 {
 			windowSlide = true
@@ -296,10 +295,10 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 		switch cmd {
 		case IRUDP_CMD_PUSH:
 			repeat := true
-			// TODO when rcv_nxt updated : Receive() parseData()
-			if sn < rudp.rcv_nxt+rudp.rcv_wnd {
+			// when rcvNxt updated : Receive() parseData()
+			if sn < rudp.rcvNxt+rudp.rcvWnd {
 				rudp.pushAck(sn, ts)
-				if sn >= rudp.rcv_nxt {
+				if sn >= rudp.rcvNxt {
 					seg := segment{
 						conv: conv,
 						cmd:  cmd,
@@ -310,7 +309,7 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 						una:  una,
 						data: data[:length],
 					}
-					// 将该分片添加到rcv_buf中，可能会添加到rcv_queue中
+					// 将该分片添加到rcvBuf中，可能会添加到rcvQueue中
 					repeat = rudp.parseData(seg)
 				}
 			}
@@ -323,7 +322,7 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 			flag |= 1
 			latest = ts
 		case IRUDP_CMD_WASK:
-			// 如果是探测包，
+			// 窗口探测包，
 			// 下一次发送数据时带上窗口大小通知remote端
 			rudp.probe |= IRUDP_ASK_TELL
 		case IRUDP_CMD_WINS:
@@ -341,15 +340,15 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 		current := currentMs()
 		rtt := timeDiff(current, latest)
 		if rtt >= 0 {
-			rudp.updateAck(rtt)
+			rudp.updateRTO(rtt)
 		}
 	}
 
 	// 当启动拥塞控制时，更新拥塞窗口cwnd
-	if rudp.nocwnd == 0 {
+	if rudp.noCwnd == 0 {
 		// 接收到新ack
-		if rudp.snd_una > oldSndUna {
-			if rudp.cwnd < rudp.rmt_wnd {
+		if rudp.sndUna > oldSndUna {
+			if rudp.cwnd < rudp.rmtWnd {
 				mss := rudp.mss
 				// 慢启动
 				if rudp.cwnd < rudp.ssthresh {
@@ -368,8 +367,8 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 						// TODO : 判断 mss>0 mss<0 ??
 					}
 				}
-				if rudp.cwnd > rudp.rmt_wnd {
-					rudp.cwnd = rudp.rmt_wnd
+				if rudp.cwnd > rudp.rmtWnd {
+					rudp.cwnd = rudp.rmtWnd
 					rudp.incr = rudp.cwnd * mss
 				}
 			}
@@ -378,7 +377,7 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 
 	if windowSlide {
 		rudp.flush(false)
-	} else if ackNoDelay && len(rudp.acklist) > 0 {
+	} else if ackNoDelay && len(rudp.ackList) > 0 {
 		rudp.flush(true)
 	}
 	return 0
@@ -386,7 +385,7 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 
 //
 // Receive
-// @Description: 从rcv_queue复制数据到buffer中，且从rcv_buf中移动分片数据到rcv_queue中
+// @Description: 从rcvQueue复制数据到buffer中，且从rcvBuf中移动分片数据到rcvQueue中
 // @receiver rudp
 // @param buffer
 // @return n 读取到的字节数，-1：没有可读数据，-2：buffer长度小于peekSize
@@ -402,14 +401,14 @@ func (rudp *RUDP) Receive(buffer []byte) (n int) {
 	}
 
 	fastRecover := false
-	if len(rudp.rcv_queue) >= int(rudp.rcv_wnd) {
+	if len(rudp.rcvQueue) >= int(rudp.rcvWnd) {
 		fastRecover = true
 	}
 
 	// 合并分片
 	count := 0
-	for i := range rudp.rcv_queue {
-		seg := &rudp.rcv_queue[i]
+	for i := range rudp.rcvQueue {
+		seg := &rudp.rcvQueue[i]
 		copy(buffer, seg.data)
 		buffer = buffer[len(seg.data):]
 		n += len(seg.data)
@@ -420,27 +419,27 @@ func (rudp *RUDP) Receive(buffer []byte) (n int) {
 		}
 	}
 	if count > 0 {
-		rudp.rcv_queue = rudp.removeFront(rudp.rcv_queue, count)
+		rudp.rcvQueue = rudp.removeFront(rudp.rcvQueue, count)
 	}
 
-	// 将rcv_buf数据转移到rcv_queue
+	// 将rcvBuf数据转移到rcvQueue
 	count = 0
-	for i := range rudp.rcv_buf {
-		seg := &rudp.rcv_buf[i]
-		if seg.sn == rudp.rcv_nxt && len(rudp.rcv_queue)+count < int(rudp.rcv_wnd) {
-			rudp.rcv_nxt++
+	for i := range rudp.rcvBuf {
+		seg := &rudp.rcvBuf[i]
+		if seg.sn == rudp.rcvNxt && len(rudp.rcvQueue)+count < int(rudp.rcvWnd) {
+			rudp.rcvNxt++
 			count++
 		} else {
 			break
 		}
 	}
 	if count > 0 {
-		rudp.rcv_queue = append(rudp.rcv_queue, rudp.rcv_buf[:count]...)
-		rudp.rcv_buf = rudp.removeFront(rudp.rcv_buf, count)
+		rudp.rcvQueue = append(rudp.rcvQueue, rudp.rcvBuf[:count]...)
+		rudp.rcvBuf = rudp.removeFront(rudp.rcvBuf, count)
 	}
 
 	// 快速恢复
-	if len(rudp.rcv_queue) < int(rudp.rcv_wnd) && fastRecover {
+	if len(rudp.rcvQueue) < int(rudp.rcvWnd) && fastRecover {
 		// 通知远端窗口大小
 		rudp.probe |= IRUDP_ASK_TELL
 	}
@@ -450,8 +449,8 @@ func (rudp *RUDP) Receive(buffer []byte) (n int) {
 // parseUna 将sndBuf中sn小于una的包删除
 func (rudp *RUDP) parseUna(una uint32) int {
 	removeCount := 0
-	for i := range rudp.snd_buf {
-		seg := &rudp.snd_buf[i]
+	for i := range rudp.sndBuf {
+		seg := &rudp.sndBuf[i]
 		if una > seg.sn {
 			rudp.delSegment(seg)
 			removeCount++
@@ -460,7 +459,7 @@ func (rudp *RUDP) parseUna(una uint32) int {
 		}
 	}
 	if removeCount > 0 {
-		rudp.snd_buf = rudp.removeFront(rudp.snd_buf, removeCount)
+		rudp.sndBuf = rudp.removeFront(rudp.sndBuf, removeCount)
 	}
 	return removeCount
 }
@@ -476,49 +475,49 @@ func (rudp *RUDP) removeFront(buf []segment, removeCount int) []segment {
 	}
 }
 
-// updateUna 根据snd_buf更新snd_una
+// updateUna 根据sndBuf更新sndUna
 func (rudp *RUDP) updateSndUna() {
-	if len(rudp.snd_buf) > 0 {
-		seg := rudp.snd_buf[0]
-		rudp.snd_una = seg.sn
+	if len(rudp.sndBuf) > 0 {
+		seg := rudp.sndBuf[0]
+		rudp.sndUna = seg.sn
 	} else {
-		rudp.snd_una = rudp.snd_nxt
+		rudp.sndUna = rudp.sndNxt
 	}
 }
 
 /**
- * rx_srtt: smoothed round trip time，平滑后的RTT
- * rx_rttval：RTT的变化量，代表连接的抖动情况
+ * rxSRTT: smoothed round trip time，平滑后的RTT
+ * rxRTTVal：RTT的变化量，代表连接的抖动情况
  * interval：内部flush刷新间隔，对系统循环效率有非常重要影响
  *
  * 该函数主要意图在于更新与ack有关的RTO时间
  * 	RTO相关：通过请求应答时间（RTT）计算出超时重传时间（RTO）
  */
-// updateAck 通过rtt更新rto
-func (rudp *RUDP) updateAck(rtt int32) {
+// updateRTO 通过rtt更新rto
+func (rudp *RUDP) updateRTO(rtt int32) {
 	// https://tools.ietf.org/html/rfc6298
 	var rto uint32
-	if rudp.rx_rttvar == 0 {
-		rudp.rx_srtt = rtt
-		rudp.rx_rttvar = rtt >> 1
+	if rudp.rxRTTVal == 0 {
+		rudp.rxSRTT = rtt
+		rudp.rxRTTVal = rtt >> 1
 	} else {
 		// 平滑抖动算法
-		delta := rudp.rx_srtt - rtt
+		delta := rudp.rxSRTT - rtt
 		// 取delta绝对值
 		if delta < 0 {
 			delta = -delta
 		}
 
-		rudp.rx_rttvar = (3*rudp.rx_rttvar + delta) / 4
-		rudp.rx_srtt = (7*rudp.rx_srtt + rtt) / 8
-		if rudp.rx_srtt < 1 {
-			rudp.rx_srtt = 1
+		rudp.rxRTTVal = (3*rudp.rxRTTVal + delta) / 4
+		rudp.rxSRTT = (7*rudp.rxSRTT + rtt) / 8
+		if rudp.rxSRTT < 1 {
+			rudp.rxSRTT = 1
 		}
 	}
 	// 通过抖动情况与内部调度间隔计算出RTO时间
-	rto = uint32(rudp.rx_srtt) + max(rudp.interval, uint32(rudp.rx_rttvar)<<2)
+	rto = uint32(rudp.rxSRTT) + max(rudp.interval, uint32(rudp.rxRTTVal)<<2)
 	// 使得最后结果在minrto <= x <=  RUDP_RTO_MAX 之间
-	rudp.rx_rto = bound(rudp.rx_minrto, rto, IRUDP_RTO_MAX)
+	rudp.rxRTO = bound(rudp.rxMinRTO, rto, IRUDP_RTO_MAX)
 }
 
 //
@@ -529,12 +528,12 @@ func (rudp *RUDP) updateAck(rtt int32) {
 //
 func (rudp *RUDP) parseAck(sn uint32) {
 	// 当前确认数据包ack的编号小于已经接收到的编号(una)或数据包的ack编号大于待分配的编号则不合法
-	if sn < rudp.snd_una || sn > rudp.snd_nxt {
+	if sn < rudp.sndUna || sn > rudp.sndNxt {
 		return
 	}
 	// 遍历snd_buf释放该编号分片
-	for i := range rudp.snd_buf {
-		seg := &rudp.snd_buf[i]
+	for i := range rudp.sndBuf {
+		seg := &rudp.sndBuf[i]
 		if sn == seg.sn {
 			seg.acked = 1
 			rudp.delSegment(seg)
@@ -548,11 +547,11 @@ func (rudp *RUDP) parseAck(sn uint32) {
 
 func (rudp *RUDP) parseFastAck(sn, ts uint32) {
 	// 当前确认数据包ack的编号小于已经接收到的编号(una)或数据包的ack编号大于待分配的编号则不合法
-	if sn < rudp.snd_una || sn > rudp.snd_nxt {
+	if sn < rudp.sndUna || sn > rudp.sndNxt {
 		return
 	}
-	for i := range rudp.snd_buf {
-		seg := &rudp.snd_buf[i]
+	for i := range rudp.sndBuf {
+		seg := &rudp.sndBuf[i]
 		if sn < seg.sn {
 			break
 		} else if sn != seg.sn && seg.ts <= ts {
@@ -569,7 +568,7 @@ func (rudp *RUDP) parseFastAck(sn, ts uint32) {
 // @param ts
 //
 func (rudp *RUDP) pushAck(sn, ts uint32) {
-	rudp.acklist = append(rudp.acklist, ackItem{sn, ts})
+	rudp.ackList = append(rudp.ackList, ackItem{sn, ts})
 }
 
 //
@@ -580,15 +579,15 @@ func (rudp *RUDP) pushAck(sn, ts uint32) {
 // @return bool  true：如果seg重复了
 //
 func (rudp *RUDP) parseData(seg segment) bool {
-	if seg.sn >= rudp.rcv_nxt+rudp.rcv_wnd || seg.sn < rudp.rcv_nxt {
+	if seg.sn >= rudp.rcvNxt+rudp.rcvWnd || seg.sn < rudp.rcvNxt {
 		return true
 	}
 
 	// 判断该包是否重复
 	repeat := false
 	insertIndex := 0
-	for i := len(rudp.rcv_buf) - 1; i >= 0; i-- {
-		s := rudp.rcv_buf[i]
+	for i := len(rudp.rcvBuf) - 1; i >= 0; i-- {
+		s := rudp.rcvBuf[i]
 		if s.sn == seg.sn {
 			repeat = true
 			break
@@ -605,25 +604,25 @@ func (rudp *RUDP) parseData(seg segment) bool {
 		copy(dataCopy, seg.data)
 		seg.data = dataCopy
 
-		// 把新数据添加到rcv_buf对应位置
-		rudp.rcv_buf = append(rudp.rcv_buf[:insertIndex], append([]segment{seg}, rudp.rcv_buf[insertIndex:]...)...)
+		// 把新数据添加到rcvBuf对应位置
+		rudp.rcvBuf = append(rudp.rcvBuf[:insertIndex], append([]segment{seg}, rudp.rcvBuf[insertIndex:]...)...)
 	}
 
-	// 把可用数据从rcv_buf转移到rcv_queue
+	// 把可用数据从rcvBuf转移到rcvQueue
 	count := 0
-	for i := range rudp.rcv_buf {
-		s := &rudp.rcv_buf[i]
-		// 确保rcv_queue中数据有序
-		if s.sn == rudp.rcv_nxt && len(rudp.rcv_queue)+count < int(rudp.rcv_wnd) {
-			rudp.rcv_nxt++
+	for i := range rudp.rcvBuf {
+		s := &rudp.rcvBuf[i]
+		// 确保rcvQueue中数据有序
+		if s.sn == rudp.rcvNxt && len(rudp.rcvQueue)+count < int(rudp.rcvWnd) {
+			rudp.rcvNxt++
 			count++
 		} else {
 			break
 		}
 	}
 	if count > 0 {
-		rudp.rcv_queue = append(rudp.rcv_queue, rudp.rcv_buf[:count]...)
-		rudp.rcv_buf = rudp.removeFront(rudp.rcv_buf, count)
+		rudp.rcvQueue = append(rudp.rcvQueue, rudp.rcvBuf[:count]...)
+		rudp.rcvBuf = rudp.removeFront(rudp.rcvBuf, count)
 	}
 	return repeat
 }
@@ -644,7 +643,7 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 	seg.wnd = rudp.unusedWnd()
 	seg.ts = 0
 	seg.sn = 0
-	seg.una = rudp.rcv_nxt
+	seg.una = rudp.rcvNxt
 	buffer := rudp.buffer
 	ptr := buffer[rudp.reserved:]
 
@@ -665,15 +664,15 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 	}
 
 	// 将ack分片添加到buffer中
-	for i, ack := range rudp.acklist {
+	for i, ack := range rudp.ackList {
 		makeSpace(IRUDP_OVERHEAD)
-		if ack.sn >= rudp.rcv_nxt || len(rudp.acklist)-1 == i {
+		if ack.sn >= rudp.rcvNxt || len(rudp.ackList)-1 == i {
 			seg.sn, seg.ts = ack.sn, ack.ts
 			// 把seg打包到buffer中
 			ptr = seg.encodeOverHead(ptr)
 		}
 	}
-	rudp.acklist = rudp.acklist[:0]
+	rudp.ackList = rudp.ackList[:0]
 	// 发送剩余ack段
 	if ackOnly {
 		flushBuffer()
@@ -681,26 +680,26 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 	}
 
 	// 如果远端窗口为0需要探测
-	if rudp.rmt_wnd == 0 {
+	if rudp.rmtWnd == 0 {
 		currentTime := currentMs()
 		// 初始化探测间隔和探测时间戳
-		if rudp.probe_wait == 0 {
-			rudp.probe_wait = IRUDP_PROBE_INIT
-			rudp.ts_probe = currentTime + rudp.probe_wait
+		if rudp.probeWait == 0 {
+			rudp.probeWait = IRUDP_PROBE_INIT
+			rudp.tsProbe = currentTime + rudp.probeWait
 		} else {
-			if timeDiff(currentTime, rudp.ts_probe) >= 0 {
-				if rudp.probe_wait < IRUDP_PROBE_MIN {
-					rudp.probe_wait = IRUDP_PROBE_MIN
+			if timeDiff(currentTime, rudp.tsProbe) >= 0 {
+				if rudp.probeWait < IRUDP_PROBE_MIN {
+					rudp.probeWait = IRUDP_PROBE_MIN
 				}
-				rudp.probe_wait += rudp.probe_wait / 2
-				rudp.probe_wait = min(IRUDP_PROBE_LIMIT, rudp.probe_wait)
-				rudp.ts_probe = currentTime + rudp.probe_wait
+				rudp.probeWait += rudp.probeWait / 2
+				rudp.probeWait = min(IRUDP_PROBE_LIMIT, rudp.probeWait)
+				rudp.tsProbe = currentTime + rudp.probeWait
 				rudp.probe |= IRUDP_ASK_SEND
 			}
 		}
 	} else {
-		rudp.probe_wait = 0
-		rudp.ts_probe = 0
+		rudp.probeWait = 0
+		rudp.tsProbe = 0
 	}
 	// 处理IRUDP_ASK_SEND
 	// 检查是否需要发送窗口探测报文
@@ -719,43 +718,43 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 	rudp.probe = 0
 
 	// 取发送窗口和远端窗口最小值得到拥塞窗口大小
-	cwnd := min(rudp.snd_wnd, rudp.rmt_wnd)
-	// 如果设置了 nocwnd, 则 cwnd 只取决于 snd_wnd 和 rmt_wnd
-	if rudp.nocwnd == 0 {
+	cwnd := min(rudp.sndWnd, rudp.rmtWnd)
+	// 如果设置了 noCwnd, 则 cwnd 只取决于 sndWnd 和 rmtWnd
+	if rudp.noCwnd == 0 {
 		cwnd = min(rudp.cwnd, cwnd)
 	}
 
 	// 处理IRUDP_CMD_PUSH
-	// 流量控制滑动窗口，把snd_queue的数据转移到snd_buf
+	// 流量控制滑动窗口，把sndQueue的数据转移到sndBuf
 	newSegCount := 0
-	for i := range rudp.snd_queue {
-		if rudp.snd_nxt >= rudp.snd_una+cwnd {
+	for i := range rudp.sndQueue {
+		if rudp.sndNxt >= rudp.sndUna+cwnd {
 			break
 		}
-		newSeg := rudp.snd_queue[i]
+		newSeg := rudp.sndQueue[i]
 		newSeg.conv = rudp.conv
 		newSeg.cmd = IRUDP_CMD_PUSH
-		newSeg.sn = rudp.snd_nxt
-		rudp.snd_buf = append(rudp.snd_buf, newSeg)
-		rudp.snd_nxt++
+		newSeg.sn = rudp.sndNxt
+		rudp.sndBuf = append(rudp.sndBuf, newSeg)
+		rudp.sndNxt++
 		newSegCount++
 	}
 	if newSegCount > 0 {
-		rudp.snd_queue = rudp.removeFront(rudp.snd_queue, newSegCount)
+		rudp.sndQueue = rudp.removeFront(rudp.sndQueue, newSegCount)
 	}
 
 	// 计算resent
-	resent := uint32(rudp.fastresend)
+	resent := uint32(rudp.fastResend)
 	// resent为0不执行快速重传
 	if resent <= 0 {
 		resent = 0xffffffff
 	}
-	minRto := int32(rudp.rx_minrto)
+	minRto := int32(rudp.rxMinRTO)
 	current := currentMs()
 	var change, fastRetransSegs, earlyRetransSegs, lostSegs uint64
-	ref := rudp.snd_buf[:len(rudp.snd_buf)]
+	ref := rudp.sndBuf[:len(rudp.sndBuf)]
 	for i := range ref {
-		s := &rudp.snd_buf[i]
+		s := &rudp.sndBuf[i]
 		needSend := false
 		if s.acked == 1 {
 			continue
@@ -763,31 +762,31 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 		// 该分片首次发送
 		if s.xmit == 0 {
 			needSend = true
-			s.rto = rudp.rx_rto
+			s.rto = rudp.rxRTO
 			s.resendts = current + s.rto
 		} else if s.fastack >= resent {
 			// 快速重传
 			needSend = true
 			s.fastack = 0
-			s.rto = rudp.rx_rto
-			s.resendts = current + rudp.rx_rto
+			s.rto = rudp.rxRTO
+			s.resendts = current + rudp.rxRTO
 			change++
 			fastRetransSegs++
 		} else if s.fastack > 0 && newSegCount == 0 {
 			// TODO 早期重传？
 			needSend = true
 			s.fastack = 0
-			s.rto = rudp.rx_rto
-			s.resendts = current + rudp.rx_rto
+			s.rto = rudp.rxRTO
+			s.resendts = current + rudp.rxRTO
 			change++
 			earlyRetransSegs++
 		} else if timeDiff(current, s.resendts) >= 0 {
 			// 超时重传
 			needSend = true
-			if rudp.nodelay == 0 {
-				s.rto += rudp.rx_rto
+			if rudp.noDelay == 0 {
+				s.rto += rudp.rxRTO
 			} else {
-				s.rto += rudp.rx_rto / 2
+				s.rto += rudp.rxRTO / 2
 			}
 			s.fastack = 0
 			s.resendts = current + s.rto
@@ -806,7 +805,7 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 			ptr = s.encodeOverHead(ptr)
 			ptr = s.encodeData(ptr)
 			//判断该分片重传次数是否大于最大重传次数
-			if s.xmit >= rudp.dead_link {
+			if s.xmit >= rudp.deadLink {
 				// 断开连接
 				rudp.state = 0xffffffff
 			}
@@ -836,13 +835,13 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 	}
 
 	// 更新拥塞窗口cwnd
-	if rudp.nocwnd == 0 {
+	if rudp.noCwnd == 0 {
 		// 更新慢启动阈值
 		// rate halving, https://tools.ietf.org/html/rfc6937
 		// 发生快速重传，触发快速恢复
 		if change > 0 {
 			// 当前发送窗口大小
-			inflight := rudp.snd_nxt - rudp.snd_una
+			inflight := rudp.sndNxt - rudp.sndUna
 			rudp.ssthresh = inflight / 2
 			rudp.ssthresh = max(rudp.ssthresh, IRUDP_THRESH_MIN)
 			rudp.cwnd = rudp.ssthresh + resent
@@ -874,8 +873,8 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 // @return uint16
 //
 func (rudp *RUDP) unusedWnd() uint16 {
-	if len(rudp.rcv_queue) < int(rudp.rcv_wnd) {
-		return uint16(int(rudp.rcv_wnd) - len(rudp.rcv_queue))
+	if len(rudp.rcvQueue) < int(rudp.rcvWnd) {
+		return uint16(int(rudp.rcvWnd) - len(rudp.rcvQueue))
 	}
 	return 0
 }
@@ -884,24 +883,24 @@ func (rudp *RUDP) unusedWnd() uint16 {
 // peekSize
 // @Description: 检查rcv_queue中第一个包的大小，需要考虑分片
 // @receiver rudp
-// @return length rcv_queue 中第一个包的大小
+// @return length rcvQueue 中第一个包的大小
 //
 func (rudp *RUDP) peekSize() (length int) {
-	if len(rudp.rcv_queue) == 0 {
+	if len(rudp.rcvQueue) == 0 {
 		return -1
 	}
 
-	seg := rudp.rcv_queue[0]
+	seg := rudp.rcvQueue[0]
 	if seg.frg == 0 {
 		return len(seg.data)
 	}
 
-	if len(rudp.rcv_queue) < int(seg.frg+1) {
+	if len(rudp.rcvQueue) < int(seg.frg+1) {
 		return -1
 	}
 
-	for i := range rudp.rcv_queue {
-		seg = rudp.rcv_queue[i]
+	for i := range rudp.rcvQueue {
+		seg = rudp.rcvQueue[i]
 		length += len(seg.data)
 		if seg.frg == 0 {
 			break
@@ -918,7 +917,7 @@ func (rudp *RUDP) peekSize() (length int) {
 // @return bool n >= mss返回false
 //
 func (rudp *RUDP) ReserveBytes(reserve int) bool {
-	if reserve >= int(rudp.mss) || reserve < 0 {
+	if reserve >= int(rudp.mtu-IRUDP_OVERHEAD) || reserve < 0 {
 		return false
 	}
 	rudp.reserved = reserve
@@ -932,22 +931,22 @@ func (rudp *RUDP) ReserveBytes(reserve int) bool {
 // @receiver rudp
 //
 func (rudp *RUDP) ReleaseTX() {
-	for i := range rudp.snd_queue {
-		if rudp.snd_queue[i].data != nil {
-			xmitBuf.Put(rudp.snd_queue[i].data)
+	for i := range rudp.sndQueue {
+		if rudp.sndQueue[i].data != nil {
+			xmitBuf.Put(rudp.sndQueue[i].data)
 		}
 	}
-	for i := range rudp.snd_buf {
-		if rudp.snd_buf[i].data != nil {
-			xmitBuf.Put(rudp.snd_buf[i].data)
+	for i := range rudp.sndBuf {
+		if rudp.sndBuf[i].data != nil {
+			xmitBuf.Put(rudp.sndBuf[i].data)
 		}
 	}
-	rudp.snd_buf, rudp.snd_queue = nil, nil
+	rudp.sndBuf, rudp.sndQueue = nil, nil
 }
 
 // WaitSnd 返回待发送的数据数量
 func (rudp *RUDP) WaitSnd() int {
-	return len(rudp.snd_buf) + len(rudp.snd_queue)
+	return len(rudp.sndBuf) + len(rudp.sndQueue)
 }
 
 //
@@ -961,11 +960,11 @@ func (rudp *RUDP) WaitSnd() int {
 //
 func (rudp *RUDP) NoDelay(noDelay int, interval int, resend int, noCwnd int) {
 	if noDelay >= 0 {
-		rudp.nodelay = uint32(noDelay)
+		rudp.noDelay = uint32(noDelay)
 		if noDelay != 0 {
-			rudp.rx_minrto = IRUDP_RTO_NDL
+			rudp.rxMinRTO = IRUDP_RTO_NDL
 		} else {
-			rudp.rx_minrto = IRUDP_RTO_MIN
+			rudp.rxMinRTO = IRUDP_RTO_MIN
 		}
 	}
 	if interval >= 0 {
@@ -977,10 +976,10 @@ func (rudp *RUDP) NoDelay(noDelay int, interval int, resend int, noCwnd int) {
 		rudp.interval = uint32(interval)
 	}
 	if resend >= 0 {
-		rudp.fastresend = int32(resend)
+		rudp.fastResend = int32(resend)
 	}
 	if noCwnd >= 0 {
-		rudp.nocwnd = int32(noCwnd)
+		rudp.noCwnd = int32(noCwnd)
 	}
 }
 
@@ -1006,10 +1005,10 @@ func (rudp *RUDP) SetMtu(mtu int) int {
 // WndSize sets maximum window size: sndwnd=32, rcvwnd=32 by default
 func (rudp *RUDP) WndSize(sndwnd int, rcvwnd int) int {
 	if sndwnd > 0 {
-		rudp.snd_wnd = uint32(sndwnd)
+		rudp.sndWnd = uint32(sndwnd)
 	}
 	if rcvwnd > 0 {
-		rudp.rcv_wnd = uint32(rcvwnd)
+		rudp.rcvWnd = uint32(rcvwnd)
 	}
 	return 0
 }
