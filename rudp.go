@@ -639,10 +639,7 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 	var seg segment
 	seg.conv = rudp.conv
 	seg.cmd = IRUDP_CMD_ACK
-	//seg.frg = 0
 	seg.wnd = rudp.unusedWnd()
-	//seg.ts = 0
-	//seg.sn = 0
 	seg.una = rudp.rcvNxt
 	buffer := rudp.buffer
 	ptr := buffer[rudp.reserved:]
@@ -777,7 +774,7 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 			needSend = true
 			s.fastack = 0
 			s.rto = rudp.rxRTO
-			s.resendts = current + rudp.rxRTO
+			s.resendts = current + s.rto
 			change++
 			earlyRetransSegs++
 		} else if timeDiff(current, s.resendts) >= 0 {
