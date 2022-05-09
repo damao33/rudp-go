@@ -169,7 +169,7 @@ func (rudp *RUDP) newSegment(size int) (seg segment) {
 func (rudp *RUDP) delSegment(seg *segment) {
 	if seg.data != nil {
 		xmitBuf.Put(seg.data)
-		seg = nil
+		seg.data = nil
 	}
 }
 
@@ -185,15 +185,17 @@ func (rudp *RUDP) Send(buffer []byte) int {
 		if n > 0 {
 			// 取出最后一个分片，计算填充空间
 			lastSegment := &rudp.sndQueue[n-1]
-			capacity := (int(rudp.mss)) - len(lastSegment.data)
-			extend := capacity
-			if len(buffer) < capacity {
-				extend = len(buffer)
-			}
+			if len(lastSegment.data) < int(rudp.mss) {
+				capacity := (int(rudp.mss)) - len(lastSegment.data)
+				extend := capacity
+				if len(buffer) < capacity {
+					extend = len(buffer)
+				}
 
-			// 填充
-			lastSegment.data = append(lastSegment.data, buffer[:extend]...)
-			buffer = buffer[extend:]
+				// 填充
+				lastSegment.data = append(lastSegment.data, buffer[:extend]...)
+				buffer = buffer[extend:]
+			}
 		}
 		if len(buffer) == 0 {
 			return 0
@@ -202,7 +204,7 @@ func (rudp *RUDP) Send(buffer []byte) int {
 
 	var count int
 	// 计算新分片数量
-	if len(buffer) < int(rudp.mss) {
+	if len(buffer) <= int(rudp.mss) {
 		count = 1
 	} else {
 		count = (len(buffer) + int(rudp.mss) - 1) / int(rudp.mss)
