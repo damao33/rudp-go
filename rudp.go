@@ -204,7 +204,7 @@ func (rudp *RUDP) Send(buffer []byte) int {
 
 	var count int
 	// 计算新分片数量
-	if len(buffer) <= int(rudp.mss) {
+	if len(buffer) < int(rudp.mss) {
 		count = 1
 	} else {
 		count = (len(buffer) + int(rudp.mss) - 1) / int(rudp.mss)
