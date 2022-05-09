@@ -275,12 +275,13 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 		data = decodeUint32(data, &sn)
 		data = decodeUint32(data, &una)
 		data = decodeUint32(data, &length)
-		if len(data) < int(length) {
+		if len(data) < int(length) || int(length) < 0 {
 			return -2
 		}
 
 		// cmd 不合法
-		if cmd != IRUDP_CMD_PUSH && cmd != IRUDP_CMD_ACK && cmd != IRUDP_CMD_WASK && cmd != IRUDP_CMD_WINS {
+		if cmd != IRUDP_CMD_PUSH && cmd != IRUDP_CMD_ACK &&
+			cmd != IRUDP_CMD_WASK && cmd != IRUDP_CMD_WINS {
 			return -3
 		}
 
@@ -356,15 +357,20 @@ func (rudp *RUDP) Input(data []byte, regular, ackNoDelay bool) int {
 					rudp.incr += mss
 				} else {
 					// 最小边界
-					if rudp.incr < rudp.mss {
-						rudp.incr = rudp.mss
+					if rudp.incr < mss {
+						rudp.incr = mss
 					}
 					// 拥塞避免, see : https://luyuhuang.tech/2020/12/09/rudp.html
 					rudp.incr += (mss*mss)/rudp.incr + (mss / 16)
 					// 当 incr 累计增加的值超过一个 mss 时, cwnd 增加 1
 					if (rudp.cwnd+1)*mss <= rudp.incr {
-						rudp.cwnd++
+						//rudp.cwnd++
 						// TODO : 判断 mss>0 mss<0 ??
+						if mss > 0 {
+							rudp.cwnd = (rudp.incr + mss - 1) / mss
+						} else {
+							rudp.cwnd = rudp.incr + mss - 1
+						}
 					}
 				}
 				if rudp.cwnd > rudp.rmtWnd {
@@ -781,6 +787,14 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 			s.resendts = current + s.rto
 			change++
 			fastRetransSegs++
+		} else if s.fastack > 0 && newSegCount == 0 {
+			// TODO 早期重传？
+			needSend = true
+			s.fastack = 0
+			s.rto = rudp.rxRTO
+			s.resendts = current + rudp.rxRTO
+			change++
+			earlyRetransSegs++
 		} else if timeDiff(current, s.resendts) >= 0 {
 			// 超时重传
 			needSend = true
@@ -793,15 +807,6 @@ func (rudp *RUDP) flush(ackOnly bool) uint32 {
 			s.resendts = current + s.rto
 			lostSegs++
 		}
-		/*else if s.fastack > 0 && newSegCount == 0 {
-			// TODO 早期重传？
-			needSend = true
-			s.fastack = 0
-			s.rto = rudp.rxRTO
-			s.resendts = current + rudp.rxRTO
-			change++
-			earlyRetransSegs++
-		}*/
 
 		if needSend {
 			current = currentMs()
