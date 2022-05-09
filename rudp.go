@@ -505,30 +505,21 @@ func (rudp *RUDP) updateSndUna() {
 func (rudp *RUDP) updateRTO(rtt int32) {
 	// https://tools.ietf.org/html/rfc6298
 	var rto uint32
-	if rudp.rxSRTT == 0 {
+	if rudp.rxRTTVal == 0 {
 		rudp.rxSRTT = rtt
 		rudp.rxRTTVal = rtt >> 1
 	} else {
 		// 平滑抖动算法
-		delta := rtt - rudp.rxSRTT
-		rudp.rxSRTT += delta >> 3
+		delta := rudp.rxSRTT - rtt
 		// 取delta绝对值
 		if delta < 0 {
 			delta = -delta
 		}
 
-		/*rudp.rxRTTVal = (3*rudp.rxRTTVal + delta) / 4
+		rudp.rxRTTVal = (3*rudp.rxRTTVal + delta) / 4
 		rudp.rxSRTT = (7*rudp.rxSRTT + rtt) / 8
 		if rudp.rxSRTT < 1 {
 			rudp.rxSRTT = 1
-		}*/
-		if rtt < rudp.rxSRTT-rudp.rxRTTVal {
-			// if the new RTT sample is below the bottom of the range of
-			// what an RTT measurement is expected to be.
-			// give an 8x reduced weight versus its normal weighting
-			rudp.rxRTTVal += (delta - rudp.rxRTTVal) >> 5
-		} else {
-			rudp.rxRTTVal += (delta - rudp.rxRTTVal) >> 2
 		}
 	}
 	// 通过抖动情况与内部调度间隔计算出RTO时间
