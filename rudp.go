@@ -497,21 +497,30 @@ func (rudp *RUDP) updateSndUna() {
 func (rudp *RUDP) updateRTO(rtt int32) {
 	// https://tools.ietf.org/html/rfc6298
 	var rto uint32
-	if rudp.rxRTTVal == 0 {
+	if rudp.rxSRTT == 0 {
 		rudp.rxSRTT = rtt
 		rudp.rxRTTVal = rtt >> 1
 	} else {
 		// 平滑抖动算法
-		delta := rudp.rxSRTT - rtt
+		delta := rtt - rudp.rxSRTT
+		rudp.rxSRTT += delta >> 3
 		// 取delta绝对值
 		if delta < 0 {
 			delta = -delta
 		}
 
-		rudp.rxRTTVal = (3*rudp.rxRTTVal + delta) / 4
+		/*rudp.rxRTTVal = (3*rudp.rxRTTVal + delta) / 4
 		rudp.rxSRTT = (7*rudp.rxSRTT + rtt) / 8
 		if rudp.rxSRTT < 1 {
 			rudp.rxSRTT = 1
+		}*/
+		if rtt < rudp.rxSRTT-rudp.rxRTTVal {
+			// if the new RTT sample is below the bottom of the range of
+			// what an RTT measurement is expected to be.
+			// give an 8x reduced weight versus its normal weighting
+			rudp.rxRTTVal += (delta - rudp.rxRTTVal) >> 5
+		} else {
+			rudp.rxRTTVal += (delta - rudp.rxRTTVal) >> 2
 		}
 	}
 	// 通过抖动情况与内部调度间隔计算出RTO时间
@@ -528,7 +537,7 @@ func (rudp *RUDP) updateRTO(rtt int32) {
 //
 func (rudp *RUDP) parseAck(sn uint32) {
 	// 当前确认数据包ack的编号小于已经接收到的编号(una)或数据包的ack编号大于待分配的编号则不合法
-	if sn < rudp.sndUna || sn > rudp.sndNxt {
+	if sn < rudp.sndUna || sn >= rudp.sndNxt {
 		return
 	}
 	// 遍历snd_buf释放该编号分片
@@ -547,7 +556,7 @@ func (rudp *RUDP) parseAck(sn uint32) {
 
 func (rudp *RUDP) parseFastAck(sn, ts uint32) {
 	// 当前确认数据包ack的编号小于已经接收到的编号(una)或数据包的ack编号大于待分配的编号则不合法
-	if sn < rudp.sndUna || sn > rudp.sndNxt {
+	if sn < rudp.sndUna || sn >= rudp.sndNxt {
 		return
 	}
 	for i := range rudp.sndBuf {

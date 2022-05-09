@@ -154,7 +154,7 @@ func (s *UDPSession) Read(b []byte) (n int, err error) {
 		case <-s.chSocketReadError:
 			return 0, s.socketReadError.Load().(error)
 		case <-s.die:
-			return 0, io.ErrClosedPipe
+			return 0, errors.WithStack(io.ErrClosedPipe)
 		}
 	}
 }
@@ -170,7 +170,7 @@ func (s *UDPSession) WriteBuffers(buffers [][]byte) (n int, err error) {
 		case <-s.chSocketWriteError:
 			return 0, s.socketWriteError.Load().(error)
 		case <-s.die:
-			return 0, io.ErrClosedPipe
+			return 0, errors.WithStack(io.ErrClosedPipe)
 		default:
 		}
 
@@ -179,7 +179,7 @@ func (s *UDPSession) WriteBuffers(buffers [][]byte) (n int, err error) {
 		if waitSnd < int(s.rudp.sndWnd) && waitSnd < int(s.rudp.rmtWnd) {
 			for _, buf := range buffers {
 				n += len(buf)
-				// 把buf放入snd_queue，数据过长则进行切片
+				// 把buf放入sndQueue，数据过长则进行切片
 				for {
 					if len(buf) <= int(s.rudp.mss) {
 						s.rudp.Send(buf)
@@ -223,7 +223,7 @@ func (s *UDPSession) WriteBuffers(buffers [][]byte) (n int, err error) {
 		case <-s.chSocketWriteError:
 			return 0, s.socketWriteError.Load().(error)
 		case <-s.die:
-			return 0, io.ErrClosedPipe
+			return 0, errors.WithStack(io.ErrClosedPipe)
 		}
 	}
 }
