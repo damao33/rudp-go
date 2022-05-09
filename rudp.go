@@ -169,7 +169,7 @@ func (rudp *RUDP) newSegment(size int) (seg segment) {
 func (rudp *RUDP) delSegment(seg *segment) {
 	if seg.data != nil {
 		xmitBuf.Put(seg.data)
-		seg = nil
+		seg.data = nil
 	}
 }
 
