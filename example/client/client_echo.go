@@ -24,8 +24,8 @@ func client() {
 
 	// dial to the echo server
 	addr := *ipaddr + ":" + strconv.Itoa(*port)
+	log.Println("client connecting to", addr, "...")
 	if sess, err := rudp.DialWithOptions(addr, nil, 0, 0); err == nil {
-		log.Println("client connecting to", addr, "...")
 		log.Println("client connected to server successfully")
 		for {
 			timenow := time.Now()
