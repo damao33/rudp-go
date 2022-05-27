@@ -15,6 +15,7 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
+			log.Println("listen:", s.LocalAddr())
 			go handleEcho(s)
 		}
 	} else {
