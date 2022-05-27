@@ -417,11 +417,11 @@ func Listen(laddr string) (net.Listener, error) {
 }
 
 func ListenWithOptions(laddr string, block BlockCrypt, dataShards, parityShards int) (*Listener, error) {
-	udpaddr, err := net.ResolveUDPAddr("udp", laddr)
+	udpAddr, err := net.ResolveUDPAddr("udp", laddr)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}
-	conn, err := net.ListenUDP("udp", udpaddr)
+	conn, err := net.ListenUDP("udp", udpAddr)
 	if err != nil {
 		return nil, errors.WithStack(err)
 	}

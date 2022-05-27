@@ -33,6 +33,7 @@ func handleEcho(conn *rudp.UDPSession) {
 			log.Println(err)
 			return
 		}
+		log.Println("snd:", buf[:n])
 		time.Sleep(10 * time.Millisecond)
 		n, err = conn.Write(buf[:n])
 		if err != nil {
@@ -50,13 +51,13 @@ func client() {
 	if sess, err := rudp.DialWithOptions("127.0.0.1:12345", nil, 0, 0); err == nil {
 		for {
 			timenow := time.Now()
-			data := make([]byte, 16*1024)
+			data := time.Now().String()
 			buf := make([]byte, len(data))
 			//log.Println("sent:", data)
 			if _, err := sess.Write([]byte(data)); err == nil {
 				// read back the data
 				if _, err := io.ReadFull(sess, buf); err == nil {
-					//log.Println("recv:", string(buf))
+					log.Println("recv:", string(buf))
 					rcvtime := time.Now()
 					log.Println("recvRTT:", rcvtime.Sub(timenow))
 				} else {
