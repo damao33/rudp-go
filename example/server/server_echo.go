@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	if listener, err := rudp.ListenWithOptions("127.0.0.1:12345", nil, 0, 0); err == nil {
+	if listener, err := rudp.ListenWithOptions("0.0.0.0:12345", nil, 0, 0); err == nil {
 		// spin-up the client
 		log.Println("server listening on port:12345...")
 		for {
