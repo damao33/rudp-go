@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"github.com/damao33/rudp-go"
-	"io"
 	"log"
 	"reflect"
 	"strconv"
@@ -35,8 +34,9 @@ func client() {
 			if _, err := sess.Write([]byte(data)); err == nil {
 				log.Println("client snd:", data)
 				// read back the data
-				if _, err := io.ReadFull(sess, buf); err == nil {
-					log.Println("client recv:", string(buf))
+				//if _, err := io.ReadFull(sess, buf); err == nil {
+				if _, err := sess.Read(buf); err == nil {
+					log.Println("client rcv:", string(buf))
 					if reflect.DeepEqual(buf, []byte(data)) {
 						log.Println("snd equals rcv")
 					} else {
